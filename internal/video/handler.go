@@ -2,70 +2,110 @@ package video
 
 import (
     "net/http"
-    "github.com/ndevendran/media_v1/internal/database"
     "encoding/json"
-    "context"
-    "fmt"
-    "github.com/google/uuid"
+    "log"
+    "strconv"
 )
 
 type Handler struct {
-    DB *database.Queries
+    Service *Service
 }
 
+func NewHandler(service *Service) *Handler {
+    return &Handler{
+        Service: service,
+    }
+}
 
 func (h *Handler) CreateVideoHandler(w http.ResponseWriter, r *http.Request) {
     decoder := json.NewDecoder(r.Body)
-    video := Video{}
-    err := decoder.Decode(&video)
+    request := CreateVideoRequest{}
+    err := decoder.Decode(&request)
     if err != nil {
-        errorMsg := fmt.Sprintf("Internal Server Error: %v", err)
-        http.Error(w, errorMsg, http.StatusInternalServerError)
+        log.Printf("Internal Server Error: %v", err)
+        http.Error(w, "internal server error", http.StatusInternalServerError)
+        return
     }
 
-    createdVideo, err := h.DB.CreateVideo(context.Background(), database.CreateVideoParams{
+    video, err := h.Service.CreateVideo(r.Context(), request)
+
+    if err != nil {
+        switch err.Error() {
+            case "title is required",
+                "title is too long",
+                "duration must be greater than zero":
+                    http.Error(
+                        w,
+                        err.Error(),
+                        http.StatusBadRequest,
+                    )
+            default:
+                log.Printf("create video: %v", err)
+                http.Error(
+                    w,
+                    "internal server error",
+                    http.StatusInternalServerError,
+                )
+        }
+
+        return
+    }
+
+    response, err := json.Marshal(Video{
+        ID: video.ID,
         Title: video.Title,
         Description: video.Description,
+        CreatedAt: video.CreatedAt,
         DurationSeconds: video.DurationSeconds,
     })
 
     if err != nil {
-        errorMsg := fmt.Sprintf("Internal Server Error: %v", err)
-        http.Error(w, errorMsg, http.StatusInternalServerError)
+        log.Printf("Internal Server Error: %v", err)
+        http.Error(
+            w,
+            "internal server error",
+            http.StatusInternalServerError,
+        )
+        return
     }
 
-    data, _ := json.Marshal(Video{
-        ID: createdVideo.ID,
-        Title: createdVideo.Title,
-        Description: createdVideo.Description,
-        CreatedAt: createdVideo.CreatedAt,
-        DurationSeconds: createdVideo.DurationSeconds,
-    })
-
     w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(201)
-	w.Write(data)
-	return
+	w.WriteHeader(http.StatusCreated)
+	w.Write(response)
 }
 
 func (h *Handler) GetVideoByIDHandler(w http.ResponseWriter, r *http.Request) {
     	pathID := r.PathValue("videoID")
 
-	    videoID, err := uuid.Parse(pathID)
+        video, err := h.Service.GetVideoByID(r.Context(), pathID)
 
         if err != nil {
-            errorMsg := fmt.Sprintf("Internal Server Error: %v", err)
-            http.Error(w, errorMsg, http.StatusBadRequest)
+            switch err.Error() {
+                case "could not parse video id":
+                        http.Error(
+                            w,
+                            err.Error(),
+                            http.StatusBadRequest,
+                        )
+                case "video not found":
+                    http.Error(
+                        w,
+                        err.Error(),
+                        http.StatusNotFound,
+                    )
+                default:
+                    log.Printf("create video: %v", err)
+                    http.Error(
+                        w,
+                        "internal server error",
+                        http.StatusInternalServerError,
+                    )
+            }
+
+            return
         }
 
-        video, err := h.DB.GetVideoByID(context.Background(), videoID)
-
-        if err != nil {
-            errorMsg := fmt.Sprintf("Internal Server Error: %v", err)
-            http.Error(w, errorMsg, http.StatusInternalServerError)
-        }
-
-        data, _ := json.Marshal(Video{
+        data, err := json.Marshal(Video{
             ID: video.ID,
             Title: video.Title,
             Description: video.Description,
@@ -73,8 +113,76 @@ func (h *Handler) GetVideoByIDHandler(w http.ResponseWriter, r *http.Request) {
             DurationSeconds: video.DurationSeconds,
         })
 
+        if err != nil {
+            log.Printf("Internal Server Error: %v", err)
+            http.Error(w, "internal server error", http.StatusInternalServerError)
+            return
+        }
+
         w.Header().Set("Content-Type", "application/json")
     	w.WriteHeader(200)
     	w.Write(data)
-    	return
+}
+
+func (h *Handler) GetVideosHandler(w http.ResponseWriter, r *http.Request) {
+    query := r.URL.Query()
+    limit, err := strconv.Atoi(query.Get("limit"))
+
+    if err != nil {
+        http.Error(w, "could not parse limit", http.StatusBadRequest)
+        return
+    }
+
+    offset, err := strconv.Atoi(query.Get("offset"))
+
+    if err != nil {
+        http.Error(w, "could not parse offset", http.StatusBadRequest)
+        return
+    }
+
+    req := GetVideosRequest{
+        Limit: int32(limit),
+        Offset: int32(offset),
+        OrderBy: query.Get("sort"),
+    }
+
+    videos, err := h.Service.GetVideos(r.Context(), req)
+
+    if err != nil {
+        switch err.Error() {
+        case "offset must be greater than 0":
+                    http.Error(
+                        w,
+                        err.Error(),
+                        http.StatusBadRequest,
+                    )
+            case "invalid sort option":
+                http.Error(
+                    w,
+                    err.Error(),
+                    http.StatusNotFound,
+                )
+            default:
+                log.Printf("Get Videos Error: %v", err)
+                http.Error(
+                    w,
+                    "internal server error",
+                    http.StatusInternalServerError,
+                )
+        }
+
+        return
+    }
+
+    data, err := json.Marshal(videos)
+
+    if err != nil {
+        log.Printf("Internal Server Error: %v", err)
+        http.Error(w, "internal server error", http.StatusInternalServerError)
+        return
+    }
+
+    w.Header().Set("Content-Type", "application/json")
+    w.WriteHeader(200)
+    w.Write(data)
 }

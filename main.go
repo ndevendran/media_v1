@@ -32,13 +32,14 @@ func main() {
     	os.Exit(1)
     }
 
-    videoHandler := &video.Handler{}
-    videoHandler.DB = database.New(db)
+    videoService := video.NewService(database.New(db))
+    videoHandler := video.NewHandler(videoService)
 
     mux := http.NewServeMux()
 
     mux.HandleFunc("POST /videos", videoHandler.CreateVideoHandler)
-    mux.HandleFunc("POST /videos/{videoID}", videoHandler.GetVideoByIDHandler)
+    mux.HandleFunc("GET /videos/{videoID}", videoHandler.GetVideoByIDHandler)
+    mux.HandleFunc("GET /videos", videoHandler.GetVideosHandler)
 
     server := &http.Server{
         Handler: mux,

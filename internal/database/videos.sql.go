@@ -55,3 +55,127 @@ func (q *Queries) GetVideoByID(ctx context.Context, id uuid.UUID) (Video, error)
 	)
 	return i, err
 }
+
+const getVideos = `-- name: GetVideos :many
+SELECT id, created_at, updated_at, title, description, duration_seconds FROM videos
+ORDER BY created_at $3
+LIMIT $1 OFFSET $2
+`
+
+type GetVideosParams struct {
+	Limit   int32
+	Offset  int32
+	Column3 interface{}
+}
+
+func (q *Queries) GetVideos(ctx context.Context, arg GetVideosParams) ([]Video, error) {
+	rows, err := q.db.QueryContext(ctx, getVideos, arg.Limit, arg.Offset, arg.Column3)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Video
+	for rows.Next() {
+		var i Video
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Title,
+			&i.Description,
+			&i.DurationSeconds,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getVideosAsc = `-- name: GetVideosAsc :many
+SELECT id, created_at, updated_at, title, description, duration_seconds FROM videos
+ORDER BY created_at ASC
+LIMIT $1 OFFSET $2
+`
+
+type GetVideosAscParams struct {
+	Limit  int32
+	Offset int32
+}
+
+func (q *Queries) GetVideosAsc(ctx context.Context, arg GetVideosAscParams) ([]Video, error) {
+	rows, err := q.db.QueryContext(ctx, getVideosAsc, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Video
+	for rows.Next() {
+		var i Video
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Title,
+			&i.Description,
+			&i.DurationSeconds,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+const getVideosDesc = `-- name: GetVideosDesc :many
+SELECT id, created_at, updated_at, title, description, duration_seconds FROM videos
+ORDER BY created_at DESC
+LIMIT $1 OFFSET $2
+`
+
+type GetVideosDescParams struct {
+	Limit  int32
+	Offset int32
+}
+
+func (q *Queries) GetVideosDesc(ctx context.Context, arg GetVideosDescParams) ([]Video, error) {
+	rows, err := q.db.QueryContext(ctx, getVideosDesc, arg.Limit, arg.Offset)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+	var items []Video
+	for rows.Next() {
+		var i Video
+		if err := rows.Scan(
+			&i.ID,
+			&i.CreatedAt,
+			&i.UpdatedAt,
+			&i.Title,
+			&i.Description,
+			&i.DurationSeconds,
+		); err != nil {
+			return nil, err
+		}
+		items = append(items, i)
+	}
+	if err := rows.Close(); err != nil {
+		return nil, err
+	}
+	if err := rows.Err(); err != nil {
+		return nil, err
+	}
+	return items, nil
+}

@@ -6,3 +6,18 @@ RETURNING *;
 -- name: GetVideoByID :one
 SELECT * FROM videos
 WHERE id=$1;
+
+-- name: GetVideos :many
+SELECT * FROM videos
+ORDER BY created_at $3
+LIMIT $1 OFFSET $2;
+
+-- name: GetVideosAsc :many
+SELECT * FROM videos
+ORDER BY created_at ASC
+LIMIT $1 OFFSET $2;
+
+-- name: GetVideosDesc :many
+SELECT * FROM videos
+ORDER BY created_at DESC
+LIMIT $1 OFFSET $2;
